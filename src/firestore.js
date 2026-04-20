@@ -268,14 +268,23 @@ export async function getMonthlyRecords(months = 12) {
       records.push({ id: doc.id, ...doc.data() })
     })
     
-    // 년월 기준으로 내림차순 정렬 (최신순)
     records.sort((a, b) => b.yearMonth.localeCompare(a.yearMonth))
-    
-    // 지정된 개월 수만큼만 반환
     return records.slice(0, months)
   } catch (error) {
     return []
   }
 }
 
+/**
+ * 월별 정산 기록 삭제
+ * @param {string} yearMonth YYYY-MM 형식
+ */
+export async function deleteMonthlyRecord(yearMonth) {
+  if (!db) throw new Error('Firebase가 초기화되지 않았습니다.')
 
+  const isConnected = await checkConnectionStatus()
+  if (!isConnected) throw new Error('Firebase 연결이 불안정합니다.')
+
+  const docRef = doc(db, 'monthly-records', yearMonth)
+  await deleteDoc(docRef)
+}

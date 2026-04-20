@@ -1,31 +1,51 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* 필수 글로벌 스타일만 유지 */
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
+    system-ui, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #ffffff; /* 앱 전체 배경 */
+  background-color: #f5f6fa;
 }
 
-/* #root 스타일 정리 - Tailwind와 충돌 방지 */
 #root {
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
   min-height: 100vh;
+  max-width: 480px;
 }
 
-/* 모달 애니메이션 */
 @keyframes modalSlideUp {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.95);
+    transform: translateY(40px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .7; }
+}
+
+.animate-fade-in {
+  animation: fadeIn .35s ease-out both;
+}
+
+.animate-modal {
+  animation: modalSlideUp .3s cubic-bezier(.2, .9, .3, 1) both;
+}
+
+input[type="text"],
+input[type="tel"] {
+  font-size: 16px;
 }

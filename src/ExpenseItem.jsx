@@ -3,11 +3,13 @@ import React, { useState, useRef, useEffect } from 'react'
 const ExpenseItem = React.memo(({ owner, item, updateRow, deleteRow }) => {
   const fmt = (num) => new Intl.NumberFormat('ko-KR').format(Math.round(num))
   const [localAmount, setLocalAmount] = useState(item.amount === 0 ? '' : fmt(item.amount))
+  const [swiped, setSwiped] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [pressTimer, setPressTimer] = useState(null)
   const inputRef = useRef(null)
+  const touchStartX = useRef(0)
+  const touchCurrentX = useRef(0)
+  const rowRef = useRef(null)
 
-  // item.amount가 외부에서 변경될 때만 localAmount 업데이트
   useEffect(() => {
     if (document.activeElement !== inputRef.current) {
       setLocalAmount(item.amount === 0 ? '' : fmt(item.amount))
@@ -16,10 +18,7 @@ const ExpenseItem = React.memo(({ owner, item, updateRow, deleteRow }) => {
 
   const handleAmountChange = (e) => {
     const value = e.target.value
-    // 콤마 제거하고 숫자만 추출
     const numericValue = value.replace(/[,\s]/g, '')
-    
-    // 숫자만 허용 (계산기 자판용)
     if (numericValue === '' || /^\d+$/.test(numericValue)) {
       const parsedValue = numericValue === '' ? 0 : parseInt(numericValue)
       setLocalAmount(parsedValue === 0 ? '' : fmt(parsedValue))
@@ -28,32 +27,33 @@ const ExpenseItem = React.memo(({ owner, item, updateRow, deleteRow }) => {
   }
 
   const handleAmountBlur = () => {
-    // 포커스를 잃을 때 최종 값 동기화
     const numericValue = localAmount === '' ? 0 : parseInt(localAmount.replace(/[,\s]/g, ''))
     if (numericValue !== item.amount) {
       updateRow(owner, item.id, 'amount', numericValue)
     }
-    // 포맷팅된 값으로 업데이트
     setLocalAmount(numericValue === 0 ? '' : fmt(numericValue))
   }
 
-  const handleLongPressStart = (e) => {
-    // 입력 필드인 경우 long press 무시
-    if (e.target.tagName === 'INPUT') {
-      return
-    }
-    
-    const timer = setTimeout(() => {
-      setShowDeleteConfirm(true)
-    }, 800)
-    setPressTimer(timer)
+  const handleTouchStart = (e) => {
+    if (item.fixed || e.target.tagName === 'INPUT') return
+    touchStartX.current = e.touches[0].clientX
+    touchCurrentX.current = e.touches[0].clientX
   }
 
-  const handleLongPressEnd = () => {
-    if (pressTimer) {
-      clearTimeout(pressTimer)
-      setPressTimer(null)
+  const handleTouchMove = (e) => {
+    if (item.fixed || e.target.tagName === 'INPUT') return
+    touchCurrentX.current = e.touches[0].clientX
+    const diff = touchStartX.current - touchCurrentX.current
+    if (diff > 60) {
+      setSwiped(true)
+    } else if (diff < -30) {
+      setSwiped(false)
     }
+  }
+
+  const handleTouchEnd = () => {
+    touchStartX.current = 0
+    touchCurrentX.current = 0
   }
 
   const confirmDelete = () => {
@@ -61,82 +61,112 @@ const ExpenseItem = React.memo(({ owner, item, updateRow, deleteRow }) => {
     setShowDeleteConfirm(false)
   }
 
-  const cancelDelete = () => {
-    setShowDeleteConfirm(false)
-  }
-
   return (
-    <div 
-      className="bg-white rounded-xl !p-4 shadow-sm border border-gray-100 mb-3" style={{pedding: '0.5rem'}}
-      onMouseDown={!item.fixed ? handleLongPressStart : undefined}
-      onMouseUp={!item.fixed ? handleLongPressEnd : undefined}
-      onMouseLeave={!item.fixed ? handleLongPressEnd : undefined}
-      onTouchStart={!item.fixed ? handleLongPressStart : undefined}
-      onTouchEnd={!item.fixed ? handleLongPressEnd : undefined}
-      title={!item.fixed ? "빈 영역을 길게 누르면 삭제" : ""}
-    >
-      <div className="flex items-center justify-between !mb-3">
-        <div className="flex items-center space-x-3 flex-1">
-          <input
-            type="text"
-            value={item.name}
-            onChange={(e) => updateRow(owner, item.id, 'name', e.target.value)}
-            placeholder="항목명을 입력하세요"
-            className="flex-1 text-base font-medium text-gray-800 bg-transparent border-none outline-none placeholder-gray-400"
-          />
-        </div>
-      </div>
-      
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-500"></span>
+    <>
+      <div
+        ref={rowRef}
+        className="relative overflow-hidden rounded-xl"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Delete button revealed by swipe */}
+        {!item.fixed && (
+          <div className="absolute right-0 top-0 bottom-0 flex items-center">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className={`h-full px-5 bg-rose-500 text-white text-xs font-semibold transition-all duration-200 ${swiped ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}
+            >
+              삭제
+            </button>
+          </div>
+        )}
+
+        <div
+          className={`relative bg-white rounded-xl p-4 border border-gray-100 transition-transform duration-200 ${swiped ? '-translate-x-16' : 'translate-x-0'}`}
+        >
+          <div className="flex items-center gap-3">
+            {/* Name input */}
+            <div className="flex-1 min-w-0">
+              <input
+                type="text"
+                value={item.name}
+                onChange={(e) => updateRow(owner, item.id, 'name', e.target.value)}
+                placeholder="항목명"
+                className="w-full text-sm font-medium text-gray-800 bg-transparent outline-none placeholder-gray-300 truncate"
+              />
+            </div>
+
+            {/* Amount input */}
+            <div className="flex items-center bg-gray-50 rounded-lg shrink-0">
+              <input
+                ref={inputRef}
+                type="tel"
+                inputMode="numeric"
+                value={localAmount}
+                onChange={handleAmountChange}
+                onBlur={handleAmountBlur}
+                className="w-28 text-right text-sm font-semibold text-gray-800 bg-transparent px-3 py-2 outline-none"
+                placeholder="0"
+              />
+              <span className="pr-3 text-xs text-gray-400">원</span>
+            </div>
+
+            {/* Delete icon (desktop) */}
+            {!item.fixed && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="hidden sm:flex w-7 h-7 items-center justify-center rounded-full text-gray-300 hover:bg-rose-50 hover:text-rose-500 transition-colors shrink-0"
+                aria-label="삭제"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+
           {item.fixed && (
-            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"></span>
+            <span className="inline-block mt-2 px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-medium rounded-full">
+              고정 항목
+            </span>
           )}
         </div>
-        <div className="flex items-center">
-          <input
-            ref={inputRef}
-            type="tel"
-            inputMode="numeric"
-            value={localAmount}
-            onChange={handleAmountChange}
-            onBlur={handleAmountBlur}
-            className="text-right text-lg font-semibold text-gray-800 bg-gray-50 rounded-lg !px-3 !py-2 border-none outline-none w-32"
-            placeholder="0"
-          />
-          <span className="ml-2 text-sm text-gray-500">원</span>
-        </div>
       </div>
 
-      {/* 삭제 확인 모달 */}
+      {/* Delete confirm modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full">
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-gray-800 mb-2">항목 삭제</h3>
-              <p className="text-gray-600 mb-6">
-                "{item.name}" 항목을 삭제하시겠습니까?
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={cancelDelete}
-                  className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="flex-1 bg-red-500 text-white py-3 px-4 rounded-xl font-medium hover:bg-red-600 transition-colors"
-                >
-                  삭제
-                </button>
-              </div>
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center px-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-xs animate-modal"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold text-gray-900 mb-1">항목 삭제</h3>
+            <p className="text-sm text-gray-500 mb-5">
+              {item.name ? `"${item.name}"` : '이 항목'}을(를) 삭제하시겠습니까?
+            </p>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 bg-rose-500 text-white text-sm font-medium rounded-xl hover:bg-rose-600 active:scale-[0.97] transition-all"
+              >
+                삭제
+              </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 })
 
