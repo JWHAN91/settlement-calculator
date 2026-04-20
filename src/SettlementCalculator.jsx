@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
-import { loadSettlementData, saveSettlementData, debounce, saveMonthlyRecord, getMonthlyRecords, deleteMonthlyRecord } from './firestore.js'
+import { loadSettlementData, saveSettlementData, debounce, saveMonthlyRecord, getMonthlyRecords } from './firestore.js'
 import ExpenseItem from './ExpenseItem.jsx'
 import {
   Chart as ChartJS,
@@ -35,8 +35,8 @@ export default function SettlementCalculator() {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [saveTargetMonth, setSaveTargetMonth] = useState(getCurrentYearMonth())
 
-  // 기록 삭제 확인
-  const [deleteTarget, setDeleteTarget] = useState(null)
+  // 덮어쓰기 확인
+  const [overwriteTarget, setOverwriteTarget] = useState(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -122,25 +122,11 @@ export default function SettlementCalculator() {
     }
   }
 
-  // 월별 기록 삭제
-  const handleDeleteRecord = async (yearMonth) => {
-    try {
-      setSaveStatus('saving')
-      setDeleteTarget(null)
-      await deleteMonthlyRecord(yearMonth)
-      setSaveStatus('saved')
-      await refreshMonthlyRecords()
-      setTimeout(() => setSaveStatus(''), 3000)
-    } catch {
-      setSaveStatus('error')
-      setTimeout(() => setSaveStatus(''), 4000)
-    }
-  }
-
   // 기존 기록을 덮어쓰기 (현재 데이터로 해당 월 재저장)
   const handleOverwriteRecord = async (yearMonth) => {
     try {
       setSaveStatus('saving')
+      setOverwriteTarget(null)
       await saveMonthlyRecord(yearMonth)
       setSaveStatus('saved')
       await refreshMonthlyRecords()
@@ -379,20 +365,12 @@ export default function SettlementCalculator() {
                   <div className="text-xs text-gray-400 mb-3">
                     재우 {fmt(record.totalMine)}원 · 재경 {fmt(record.totalSiblings)}원
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleOverwriteRecord(record.yearMonth)}
-                      className="flex-1 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 active:scale-[0.97] transition-all"
-                    >
-                      현재 데이터로 갱신
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(record.yearMonth)}
-                      className="py-2 px-3 text-xs font-medium text-rose-500 bg-rose-50 rounded-lg hover:bg-rose-100 active:scale-[0.97] transition-all"
-                    >
-                      삭제
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setOverwriteTarget(record.yearMonth)}
+                    className="w-full py-2 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 active:scale-[0.97] transition-all"
+                  >
+                    현재 데이터로 덮어쓰기
+                  </button>
                 </div>
               ))}
             </div>
@@ -404,31 +382,30 @@ export default function SettlementCalculator() {
         </BottomSheet>
       )}
 
-      {/* ── Delete Confirm ── */}
-      {deleteTarget && (
+      {/* ── Overwrite Confirm ── */}
+      {overwriteTarget && (
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center px-6"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setDeleteTarget(null)}
+          onClick={() => setOverwriteTarget(null)}
         >
           <div className="bg-white rounded-2xl p-6 w-full max-w-xs animate-modal" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-gray-900 mb-1">기록 삭제</h3>
+            <h3 className="text-base font-bold text-gray-900 mb-1">기록 덮어쓰기</h3>
             <p className="text-sm text-gray-500 mb-5">
-              <strong>{deleteTarget}</strong> 월별 기록을 삭제하시겠습니까?<br />
-              <span className="text-xs text-gray-400">이 작업은 되돌릴 수 없습니다.</span>
+              <strong>{overwriteTarget}</strong> 기록을 현재 정산 데이터로 덮어쓰시겠습니까?
             </p>
             <div className="flex gap-2.5">
               <button
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => setOverwriteTarget(null)}
                 className="flex-1 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all"
               >
                 취소
               </button>
               <button
-                onClick={() => handleDeleteRecord(deleteTarget)}
-                className="flex-1 py-2.5 bg-rose-500 text-white text-sm font-medium rounded-xl hover:bg-rose-600 active:scale-[0.97] transition-all"
+                onClick={() => handleOverwriteRecord(overwriteTarget)}
+                className="flex-1 py-2.5 bg-indigo-500 text-white text-sm font-medium rounded-xl hover:bg-indigo-600 active:scale-[0.97] transition-all"
               >
-                삭제
+                덮어쓰기
               </button>
             </div>
           </div>
