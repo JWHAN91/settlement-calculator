@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
@@ -7,6 +15,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f6fa;
+  overscroll-behavior: none;
 }
 
 #root {
@@ -48,4 +57,9 @@ body {
 input[type="text"],
 input[type="tel"] {
   font-size: 16px;
+}
+
+/* iOS Safari 번역/접근성 위젯 숨김 */
+[id^="apple-"] {
+  display: none !important;
 }
